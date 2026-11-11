@@ -1,0 +1,755 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Banet - Live Internet Statistics & Speed Tester</title>
+  <!-- Tailwind CSS CDN for utility classes -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          colors: {
+            obsidian: '#070a11',
+            darkcard: '#0f172a',
+            cyanGlow: '#06b6d4',
+            indigoGlow: '#6366f1',
+            emeraldGlow: '#10b981'
+          }
+        }
+      }
+    }
+  </script>
+  <!-- Offline-ready local vendor libraries -->
+  <script src="/static/vendor/chart.umd.min.js"></script>
+  <script src="/static/vendor/lucide.min.js"></script>
+  <link rel="stylesheet" href="/static/css/style.css">
+</head>
+<body class="bg-obsidian text-slate-100 flex flex-col min-h-screen">
+
+  <!-- Top App Navigation Bar -->
+  <header class="border-b border-white/10 bg-slate-950/70 backdrop-blur-xl sticky top-0 z-50 px-4 lg:px-8 py-3.5">
+    <div class="max-w-7xl mx-auto flex flex-wrap items-center justify-between gap-4">
+      
+      <!-- Brand Logo & Live Status -->
+      <div class="flex items-center gap-3.5">
+        <div class="w-10 h-10 rounded-xl bg-gradient-to-tr from-indigo-500 to-cyan-400 p-0.5 flex items-center justify-center shadow-lg shadow-indigo-500/30">
+          <div class="w-full h-full bg-slate-950 rounded-[10px] flex items-center justify-center">
+            <i data-lucide="activity" class="w-5 h-5 text-cyan-400"></i>
+          </div>
+        </div>
+        <div>
+          <div class="flex items-center gap-2">
+            <span class="font-bold tracking-tight text-xl text-white brand-title">Banet</span>
+          </div>
+          <div class="flex items-center gap-1.5 text-xs text-slate-400">
+            <span id="headerStatusDot" class="status-dot online"></span>
+            <span id="headerStatusText" class="font-medium text-emerald-400">Online & Tracking</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Current Connection Badge with Inline Rename -->
+      <div class="flex items-center gap-2.5 px-3.5 py-2 rounded-xl bg-slate-900/90 border border-white/10 hover:border-indigo-500/40 transition shadow-inner">
+        <div class="w-7 h-7 rounded-lg bg-indigo-500/10 flex items-center justify-center text-indigo-400">
+          <i id="connectionTypeIcon" data-lucide="network" class="w-4 h-4"></i>
+        </div>
+        <div class="text-left">
+          <div class="flex items-center gap-1.5">
+            <span id="currentNetworkName" class="text-sm font-semibold text-slate-100 tracking-tight">Detecting connection...</span>
+            <button id="renameNetworkBtn" title="Rename this connection for future analytics" class="text-slate-400 hover:text-indigo-400 p-0.5 transition">
+              <i data-lucide="edit-3" class="w-3.5 h-3.5"></i>
+            </button>
+          </div>
+          <div class="flex items-center gap-2 text-[11px] text-slate-400">
+            <span id="currentIsp" class="truncate max-w-[140px]">...</span>
+            <span>•</span>
+            <span id="currentCityCountry">...</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Actions & Navigation Tabs -->
+      <div class="flex items-center gap-3">
+        <!-- Improve Internet / Restart Router Action Button -->
+        <button id="openOptimizerBtn" class="btn btn-boost text-xs px-3.5 py-2 rounded-xl flex items-center gap-2 font-semibold shadow-sm">
+          <i data-lucide="zap" class="w-4 h-4 text-emerald-400"></i>
+          <span>Improve Internet</span>
+        </button>
+
+        <!-- Navigation Tabs -->
+        <nav class="tab-nav">
+          <button class="tab-btn active" data-tab="live">
+            <i data-lucide="radio" class="w-4 h-4 text-cyan-400"></i>
+            <span>Live HUD</span>
+          </button>
+          <button class="tab-btn" data-tab="speedtest">
+            <i data-lucide="gauge" class="w-4 h-4 text-indigo-400"></i>
+            <span>Speed Test</span>
+          </button>
+          <button class="tab-btn" data-tab="analytics">
+            <i data-lucide="bar-chart-3" class="w-4 h-4 text-emerald-400"></i>
+            <span>Analytics</span>
+          </button>
+          <button class="tab-btn" data-tab="details">
+            <i data-lucide="cpu" class="w-4 h-4 text-purple-400"></i>
+            <span>Diagnostics</span>
+          </button>
+        </nav>
+      </div>
+
+    </div>
+  </header>
+
+  <!-- Main Content Container -->
+  <main class="max-w-7xl mx-auto w-full px-4 lg:px-8 py-6 flex-1">
+
+    <!-- ========================================== -->
+    <!-- TAB 1: LIVE HUD (Continuous Real-Time)    -->
+    <!-- ========================================== -->
+    <section id="tab-live" class="tab-content block space-y-6">
+
+      <!-- 4 Live Telemetry Hero KPI Cards -->
+      <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        
+        <!-- Ping / Latency -->
+        <div class="glass-panel p-5 relative overflow-hidden group">
+          <div class="absolute -right-4 -bottom-4 w-24 h-24 bg-cyan-500/10 rounded-full blur-2xl group-hover:bg-cyan-500/20 transition"></div>
+          <div class="flex items-center justify-between text-slate-400 text-xs font-semibold uppercase tracking-wider mb-2">
+            <span>Live Latency</span>
+            <i data-lucide="clock" class="w-4 h-4 text-cyan-400"></i>
+          </div>
+          <div class="flex items-baseline gap-1.5 my-1">
+            <span id="livePing" class="mono text-3xl font-extrabold text-cyan-400">--</span>
+            <span class="text-sm font-semibold text-slate-400">ms</span>
+          </div>
+          <div class="flex items-center justify-between text-xs text-slate-400 pt-2 border-t border-white/5 mono">
+            <span>Min: <b id="minPing" class="text-slate-300">--</b></span>
+            <span>Avg: <b id="avgPing" class="text-slate-300">--</b></span>
+            <span>Max: <b id="maxPing" class="text-slate-300">--</b></span>
+          </div>
+        </div>
+
+        <!-- Jitter -->
+        <div class="glass-panel p-5 relative overflow-hidden group">
+          <div class="absolute -right-4 -bottom-4 w-24 h-24 bg-indigo-500/10 rounded-full blur-2xl group-hover:bg-indigo-500/20 transition"></div>
+          <div class="flex items-center justify-between text-slate-400 text-xs font-semibold uppercase tracking-wider mb-2">
+            <span>Jitter (Stability)</span>
+            <i data-lucide="git-commit" class="w-4 h-4 text-indigo-400"></i>
+          </div>
+          <div class="flex items-baseline gap-1.5 my-1">
+            <span id="liveJitter" class="mono text-3xl font-extrabold text-indigo-400">--</span>
+            <span class="text-sm font-semibold text-slate-400">ms</span>
+          </div>
+          <div class="flex items-center justify-between text-xs text-slate-400 pt-2 border-t border-white/5">
+            <span id="jitterStabilityLabel" class="text-slate-300">RFC 3550 Standard</span>
+            <span id="jitterBadge" class="badge badge-blue">Normal</span>
+          </div>
+        </div>
+
+        <!-- Packet Loss -->
+        <div class="glass-panel p-5 relative overflow-hidden group">
+          <div class="absolute -right-4 -bottom-4 w-24 h-24 bg-emerald-500/10 rounded-full blur-2xl group-hover:bg-emerald-500/20 transition"></div>
+          <div class="flex items-center justify-between text-slate-400 text-xs font-semibold uppercase tracking-wider mb-2">
+            <span>Packet Loss</span>
+            <i data-lucide="shield-alert" class="w-4 h-4 text-emerald-400"></i>
+          </div>
+          <div class="flex items-baseline gap-1.5 my-1">
+            <span id="livePacketLoss" class="mono text-3xl font-extrabold text-emerald-400">0.0</span>
+            <span class="text-sm font-semibold text-slate-400">%</span>
+          </div>
+          <div class="flex items-center justify-between text-xs text-slate-400 pt-2 border-t border-white/5">
+            <span>Rolling 30s Window</span>
+            <span id="lossBadge" class="badge badge-green">0% Drops</span>
+          </div>
+        </div>
+
+        <!-- Real-Time Bandwidth I/O -->
+        <div class="glass-panel p-5 relative overflow-hidden group">
+          <div class="absolute -right-4 -bottom-4 w-24 h-24 bg-purple-500/10 rounded-full blur-2xl group-hover:bg-purple-500/20 transition"></div>
+          <div class="flex items-center justify-between text-slate-400 text-xs font-semibold uppercase tracking-wider mb-2">
+            <span>Live Adapter I/O</span>
+            <i data-lucide="arrow-down-up" class="w-4 h-4 text-purple-400"></i>
+          </div>
+          <div class="grid grid-cols-2 gap-2 my-1">
+            <div>
+              <div class="text-[10px] text-cyan-400 flex items-center gap-1 font-semibold">
+                <i data-lucide="arrow-down" class="w-3 h-3"></i> DL
+              </div>
+              <div class="mono text-base font-bold text-slate-100" id="liveDownloadRate">0.0 Mbps</div>
+            </div>
+            <div>
+              <div class="text-[10px] text-indigo-400 flex items-center gap-1 font-semibold">
+                <i data-lucide="arrow-up" class="w-3 h-3"></i> UL
+              </div>
+              <div class="mono text-base font-bold text-slate-100" id="liveUploadRate">0.0 Mbps</div>
+            </div>
+          </div>
+          <div class="flex items-center justify-between text-xs text-slate-400 pt-2 border-t border-white/5 mono">
+            <span class="truncate text-[11px]" id="adapterBadge">Interface: Active</span>
+          </div>
+        </div>
+
+      </div>
+
+      <!-- One-Click Destination Option Selector (Click to set immediately, Set button removed) -->
+      <div class="glass-panel p-5 space-y-3">
+        <div class="flex items-center justify-between">
+          <div>
+            <span class="text-xs uppercase font-bold text-slate-300 tracking-wider flex items-center gap-2">
+              <i data-lucide="server" class="w-4 h-4 text-cyan-400"></i>
+              Test Destination
+            </span>
+            <p class="text-xs text-slate-400 mt-0.5">Click any location below to switch live ping and jitter monitoring instantly:</p>
+          </div>
+          <span class="text-xs mono text-cyan-400 bg-cyan-950/40 px-2.5 py-1 rounded-lg border border-cyan-500/30">
+            Active: <strong id="activeTargetLabel">Global Fast Edge</strong>
+          </span>
+        </div>
+
+        <div class="grid grid-cols-2 sm:grid-cols-4 gap-3 pt-1" id="destinationOptions">
+          
+          <button class="destination-pill active" data-target="1.1.1.1" data-label="Global Fast Edge">
+            <i data-lucide="globe" class="w-4 h-4 text-cyan-400"></i>
+            <div class="text-left">
+              <div class="text-xs font-bold leading-tight">Global Fast Edge</div>
+              <div class="text-[10px] opacity-75 font-normal">Cloudflare Edge</div>
+            </div>
+          </button>
+
+          <button class="destination-pill" data-target="8.8.8.8" data-label="Global Alternate">
+            <i data-lucide="cloud" class="w-4 h-4 text-indigo-400"></i>
+            <div class="text-left">
+              <div class="text-xs font-bold leading-tight">Global Alternate</div>
+              <div class="text-[10px] opacity-75 font-normal">Google Global</div>
+            </div>
+          </button>
+
+          <button class="destination-pill" data-target="9.9.9.9" data-label="Quad9 Secure">
+            <i data-lucide="shield" class="w-4 h-4 text-emerald-400"></i>
+            <div class="text-left">
+              <div class="text-xs font-bold leading-tight">Quad9 Secure</div>
+              <div class="text-[10px] opacity-75 font-normal">Privacy Anycast</div>
+            </div>
+          </button>
+
+          <button class="destination-pill" data-target="gateway" data-label="Home Router (Wi-Fi)" id="gatewayTargetBtn">
+            <i data-lucide="router" class="w-4 h-4 text-purple-400"></i>
+            <div class="text-left">
+              <div class="text-xs font-bold leading-tight">Home Router</div>
+              <div class="text-[10px] opacity-75 font-normal" id="gatewayPillSub">Local Wi-Fi link</div>
+            </div>
+          </button>
+
+        </div>
+      </div>
+
+      <!-- Live Streaming Waveform Charts (Latency & Bandwidth) -->
+      <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        
+        <!-- Live Latency Waveform Chart -->
+        <div class="glass-panel p-5 space-y-3">
+          <div class="flex items-center justify-between">
+            <div>
+              <h3 class="text-sm font-bold text-slate-100 flex items-center gap-2">
+                <i data-lucide="activity" class="w-4 h-4 text-cyan-400"></i>
+                Live Latency & Jitter Stream
+              </h3>
+              <p class="text-xs text-slate-400">Continuous real-time pulse telemetry</p>
+            </div>
+            <span class="text-xs font-mono text-cyan-400 bg-cyan-950/40 px-2 py-0.5 rounded border border-cyan-500/30">Target: <span id="chartTargetLabel">Global Fast Edge</span></span>
+          </div>
+          <div class="h-60 w-full relative">
+            <canvas id="liveLatencyChart"></canvas>
+          </div>
+        </div>
+
+        <!-- Live Network I/O Bandwidth Chart -->
+        <div class="glass-panel p-5 space-y-3">
+          <div class="flex items-center justify-between">
+            <div>
+              <h3 class="text-sm font-bold text-slate-100 flex items-center gap-2">
+                <i data-lucide="waves" class="w-4 h-4 text-indigo-400"></i>
+                Live Interface Traffic (Download vs Upload)
+              </h3>
+              <p class="text-xs text-slate-400">Current network throughput passing through device</p>
+            </div>
+            <span class="text-xs font-mono text-indigo-400 bg-indigo-950/40 px-2 py-0.5 rounded border border-indigo-500/30">Real-Time Mbps</span>
+          </div>
+          <div class="h-60 w-full relative">
+            <canvas id="liveBandwidthChart"></canvas>
+          </div>
+        </div>
+
+      </div>
+
+    </section>
+
+    <!-- ========================================== -->
+    <!-- TAB 2: SPEED TEST (Full Benchmark)        -->
+    <!-- ========================================== -->
+    <section id="tab-speedtest" class="tab-content hidden space-y-6">
+
+      <!-- Speedometer Hero Card -->
+      <div class="glass-panel p-6 lg:p-10 text-center relative overflow-hidden">
+        
+        <div class="max-w-xl mx-auto flex flex-col items-center">
+          
+          <div class="text-xs font-semibold uppercase tracking-widest text-indigo-400 mb-2">Internet Speed Benchmark</div>
+          <h2 class="text-2xl font-extrabold text-white mb-6">Test Your Live Connection Throughput</h2>
+
+          <!-- Circular SVG Gauge -->
+          <div class="relative w-64 h-64 my-2 flex items-center justify-center">
+            <svg class="w-full h-full gauge-svg" viewBox="0 0 200 200">
+              <defs>
+                <linearGradient id="speedGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+                  <stop offset="0%" stop-color="#6366f1" />
+                  <stop offset="50%" stop-color="#06b6d4" />
+                  <stop offset="100%" stop-color="#10b981" />
+                </linearGradient>
+              </defs>
+              <circle class="gauge-bg" cx="100" cy="100" r="85" fill="none" stroke-width="12" />
+              <circle id="speedGaugeRing" class="gauge-meter" cx="100" cy="100" r="85" fill="none" stroke-width="12" stroke-dasharray="534" stroke-dashoffset="534" stroke-linecap="round" />
+            </svg>
+
+            <!-- Center Gauge Value -->
+            <div class="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
+              <span id="gaugeSpeedVal" class="mono text-5xl font-black text-white tracking-tight">0.0</span>
+              <span id="gaugeUnitVal" class="text-xs uppercase font-semibold text-slate-400 mt-1">Mbps</span>
+              <span id="gaugeStageBadge" class="mt-2 text-[11px] font-semibold uppercase px-2 py-0.5 rounded-full bg-white/10 text-slate-300">Ready</span>
+            </div>
+          </div>
+
+          <!-- Benchmark Action Button -->
+          <div class="mt-6 flex flex-col sm:flex-row items-center gap-4">
+            <button id="startSpeedTestBtn" class="btn btn-primary text-base px-8 py-3.5 rounded-xl font-bold flex items-center gap-3">
+              <i data-lucide="play" class="w-5 h-5 fill-current"></i>
+              <span>START SPEED TEST</span>
+            </button>
+          </div>
+
+          <!-- Benchmark Status Message -->
+          <p id="speedTestStatusMsg" class="text-xs text-slate-400 mt-4 min-h-[20px]">
+            Ready to test. Results will be automatically saved under <strong class="text-indigo-300" id="speedTestTargetNetName">Current Connection</strong>.
+          </p>
+
+        </div>
+
+      </div>
+
+      <!-- Speed Test Results Breakdown Card -->
+      <div id="testResultCard" class="glass-panel p-6 space-y-6">
+        <div class="flex flex-wrap items-center justify-between gap-4 border-b border-white/10 pb-4">
+          <div>
+            <h3 class="text-base font-bold text-white flex items-center gap-2">
+              <i data-lucide="check-circle" class="w-5 h-5 text-emerald-400"></i>
+              Latest Benchmark Result
+            </h3>
+            <p class="text-xs text-slate-400" id="resultTimestamp">Ran just now</p>
+          </div>
+          <div class="flex items-center gap-2">
+            <span class="text-xs text-slate-400">Saved to:</span>
+            <span id="resultNetworkTag" class="badge badge-purple">Connection</span>
+          </div>
+        </div>
+
+        <!-- 4 Core Metrics -->
+        <div class="grid grid-cols-2 md:grid-cols-4 gap-4 text-center">
+          <div class="p-4 rounded-xl bg-slate-900/60 border border-white/5">
+            <div class="text-xs text-slate-400 font-medium mb-1">Download Speed</div>
+            <div class="mono text-2xl lg:text-3xl font-extrabold text-cyan-400" id="resDownload">--</div>
+            <div class="text-[11px] text-slate-500 uppercase mt-1">Mbps</div>
+          </div>
+          <div class="p-4 rounded-xl bg-slate-900/60 border border-white/5">
+            <div class="text-xs text-slate-400 font-medium mb-1">Upload Speed</div>
+            <div class="mono text-2xl lg:text-3xl font-extrabold text-indigo-400" id="resUpload">--</div>
+            <div class="text-[11px] text-slate-500 uppercase mt-1">Mbps</div>
+          </div>
+          <div class="p-4 rounded-xl bg-slate-900/60 border border-white/5">
+            <div class="text-xs text-slate-400 font-medium mb-1">Ping / Latency</div>
+            <div class="mono text-2xl lg:text-3xl font-extrabold text-emerald-400" id="resPing">--</div>
+            <div class="text-[11px] text-slate-500 uppercase mt-1">ms</div>
+          </div>
+          <div class="p-4 rounded-xl bg-slate-900/60 border border-white/5">
+            <div class="text-xs text-slate-400 font-medium mb-1">Jitter</div>
+            <div class="mono text-2xl lg:text-3xl font-extrabold text-purple-400" id="resJitter">--</div>
+            <div class="text-[11px] text-slate-500 uppercase mt-1">ms</div>
+          </div>
+        </div>
+
+        <!-- Quality & Experience Score Grades -->
+        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 pt-2">
+          
+          <div class="p-3.5 rounded-xl bg-slate-900/40 border border-white/5 flex items-center justify-between">
+            <div class="flex items-center gap-3">
+              <div class="w-8 h-8 rounded-lg bg-emerald-500/10 flex items-center justify-center text-emerald-400">
+                <i data-lucide="gamepad-2" class="w-4 h-4"></i>
+              </div>
+              <div>
+                <div class="text-xs font-semibold text-slate-300">Gaming Score</div>
+                <div class="text-[10px] text-slate-400">Low latency & jitter</div>
+              </div>
+            </div>
+            <span id="gradeGaming" class="badge badge-green text-sm font-bold">A</span>
+          </div>
+
+          <div class="p-3.5 rounded-xl bg-slate-900/40 border border-white/5 flex items-center justify-between">
+            <div class="flex items-center gap-3">
+              <div class="w-8 h-8 rounded-lg bg-cyan-500/10 flex items-center justify-center text-cyan-400">
+                <i data-lucide="tv" class="w-4 h-4"></i>
+              </div>
+              <div>
+                <div class="text-xs font-semibold text-slate-300">Streaming</div>
+                <div class="text-[10px] text-slate-400">4K HDR / 1080p</div>
+              </div>
+            </div>
+            <span id="gradeStreaming" class="badge badge-blue text-xs font-bold truncate max-w-[100px]">A+ (4K)</span>
+          </div>
+
+          <div class="p-3.5 rounded-xl bg-slate-900/40 border border-white/5 flex items-center justify-between">
+            <div class="flex items-center gap-3">
+              <div class="w-8 h-8 rounded-lg bg-indigo-500/10 flex items-center justify-center text-indigo-400">
+                <i data-lucide="video" class="w-4 h-4"></i>
+              </div>
+              <div>
+                <div class="text-xs font-semibold text-slate-300">Video Calls</div>
+                <div class="text-[10px] text-slate-400">Zoom / Teams / Meet</div>
+              </div>
+            </div>
+            <span id="gradeVideo" class="badge badge-purple text-xs font-bold truncate max-w-[100px]">Flawless</span>
+          </div>
+
+          <div class="p-3.5 rounded-xl bg-slate-900/40 border border-white/5 flex items-center justify-between">
+            <div class="flex items-center gap-3">
+              <div class="w-8 h-8 rounded-lg bg-amber-500/10 flex items-center justify-center text-amber-400">
+                <i data-lucide="layers" class="w-4 h-4"></i>
+              </div>
+              <div>
+                <div class="text-xs font-semibold text-slate-300">Bufferbloat</div>
+                <div class="text-[10px] text-slate-400">Loaded latency</div>
+              </div>
+            </div>
+            <span id="gradeBufferbloat" class="badge badge-yellow text-sm font-bold">A</span>
+          </div>
+
+        </div>
+
+      </div>
+
+    </section>
+
+    <!-- ========================================== -->
+    <!-- TAB 3: ANALYTICS & HISTORY                 -->
+    <!-- ========================================== -->
+    <section id="tab-analytics" class="tab-content hidden space-y-6">
+
+      <!-- Analytics Filter Header -->
+      <div class="glass-panel p-4 flex flex-wrap items-center justify-between gap-4">
+        <div class="flex items-center gap-3">
+          <label for="networkFilterSelect" class="text-xs font-semibold uppercase text-slate-400 tracking-wider">Filter By Connection:</label>
+          <select id="networkFilterSelect" class="bg-slate-900 border border-white/10 rounded-lg px-3 py-1.5 text-xs text-slate-200 focus:outline-none focus:border-indigo-500">
+            <option value="">All Saved Connections</option>
+          </select>
+        </div>
+
+        <div class="flex items-center gap-2">
+          <button id="exportCsvBtn" class="btn text-xs px-3 py-1.5">
+            <i data-lucide="download" class="w-3.5 h-3.5"></i> Export CSV
+          </button>
+          <button id="exportJsonBtn" class="btn text-xs px-3 py-1.5">
+            <i data-lucide="file-code" class="w-3.5 h-3.5"></i> Export JSON
+          </button>
+          <button id="clearHistoryBtn" class="btn btn-danger text-xs px-3 py-1.5">
+            <i data-lucide="trash-2" class="w-3.5 h-3.5"></i> Clear History
+          </button>
+        </div>
+      </div>
+
+      <!-- Summary Metric Cards -->
+      <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
+        <div class="glass-panel p-4 text-center">
+          <div class="text-[10px] uppercase font-semibold text-slate-400">Max Download</div>
+          <div class="mono text-xl font-bold text-cyan-400 mt-1" id="statMaxDown">--</div>
+          <div class="text-[10px] text-slate-500">Mbps</div>
+        </div>
+        <div class="glass-panel p-4 text-center">
+          <div class="text-[10px] uppercase font-semibold text-slate-400">Avg Download</div>
+          <div class="mono text-xl font-bold text-cyan-300 mt-1" id="statAvgDown">--</div>
+          <div class="text-[10px] text-slate-500">Mbps</div>
+        </div>
+        <div class="glass-panel p-4 text-center">
+          <div class="text-[10px] uppercase font-semibold text-slate-400">Max Upload</div>
+          <div class="mono text-xl font-bold text-indigo-400 mt-1" id="statMaxUp">--</div>
+          <div class="text-[10px] text-slate-500">Mbps</div>
+        </div>
+        <div class="glass-panel p-4 text-center">
+          <div class="text-[10px] uppercase font-semibold text-slate-400">Avg Upload</div>
+          <div class="mono text-xl font-bold text-indigo-300 mt-1" id="statAvgUp">--</div>
+          <div class="text-[10px] text-slate-500">Mbps</div>
+        </div>
+        <div class="glass-panel p-4 text-center">
+          <div class="text-[10px] uppercase font-semibold text-slate-400">Best Ping</div>
+          <div class="mono text-xl font-bold text-emerald-400 mt-1" id="statMinPing">--</div>
+          <div class="text-[10px] text-slate-500">ms</div>
+        </div>
+        <div class="glass-panel p-4 text-center">
+          <div class="text-[10px] uppercase font-semibold text-slate-400">Total Tests</div>
+          <div class="mono text-xl font-bold text-slate-100 mt-1" id="statTotalTests">0</div>
+          <div class="text-[10px] text-slate-500">benchmarks</div>
+        </div>
+      </div>
+
+      <!-- Historical Chart -->
+      <div class="glass-panel p-5 space-y-3">
+        <div class="flex items-center justify-between">
+          <h3 class="text-sm font-bold text-slate-100 flex items-center gap-2">
+            <i data-lucide="trending-up" class="w-4 h-4 text-indigo-400"></i>
+            Historical Speed Performance
+          </h3>
+          <span class="text-xs text-slate-400">Chronological benchmarks</span>
+        </div>
+        <div class="h-64 w-full relative">
+          <canvas id="historySpeedChart"></canvas>
+        </div>
+      </div>
+
+      <!-- Test Log Table -->
+      <div class="glass-panel overflow-hidden">
+        <div class="px-5 py-4 border-b border-white/10 flex items-center justify-between">
+          <h3 class="text-sm font-bold text-slate-100 flex items-center gap-2">
+            <i data-lucide="list" class="w-4 h-4 text-cyan-400"></i>
+            Speed Test History Records
+          </h3>
+          <span class="text-xs text-slate-400" id="tableRecordCount">0 records</span>
+        </div>
+        <div class="overflow-x-auto">
+          <table class="w-full text-left text-xs">
+            <thead class="bg-slate-900/60 text-slate-400 uppercase tracking-wider font-semibold border-b border-white/5">
+              <tr>
+                <th class="px-4 py-3">Timestamp</th>
+                <th class="px-4 py-3">Connection Name</th>
+                <th class="px-4 py-3 text-right">Download</th>
+                <th class="px-4 py-3 text-right">Upload</th>
+                <th class="px-4 py-3 text-right">Ping</th>
+                <th class="px-4 py-3 text-right">Jitter</th>
+                <th class="px-4 py-3 text-center">Gaming</th>
+                <th class="px-4 py-3 text-center">Action</th>
+              </tr>
+            </thead>
+            <tbody id="historyTableBody" class="divide-y divide-white/5 text-slate-300 mono">
+              <tr>
+                <td colspan="8" class="px-4 py-8 text-center text-slate-500 font-sans">
+                  No speed tests recorded yet. Run your first speed test!
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+    </section>
+
+    <!-- ========================================== -->
+    <!-- TAB 4: DIAGNOSTICS & NETWORK DETAILS       -->
+    <!-- ========================================== -->
+    <section id="tab-details" class="tab-content hidden space-y-6">
+
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+
+        <!-- Connection Identity Card -->
+        <div class="glass-panel p-6 space-y-4">
+          <h3 class="text-base font-bold text-white flex items-center gap-2 border-b border-white/10 pb-3">
+            <i data-lucide="fingerprint" class="w-5 h-5 text-indigo-400"></i>
+            Connection Profile & Persistent Identity
+          </h3>
+
+          <div class="space-y-3 text-xs">
+            <div class="flex justify-between py-1.5 border-b border-white/5">
+              <span class="text-slate-400">Saved Network Name:</span>
+              <span class="font-bold text-indigo-300" id="diagCustomName">--</span>
+            </div>
+            <div class="flex justify-between py-1.5 border-b border-white/5">
+              <span class="text-slate-400">Unique Fingerprint:</span>
+              <span class="mono text-slate-300" id="diagFingerprint">--</span>
+            </div>
+            <div class="flex justify-between py-1.5 border-b border-white/5">
+              <span class="text-slate-400">Connection Medium:</span>
+              <span class="badge badge-blue" id="diagMedium">Ethernet</span>
+            </div>
+            <div class="flex justify-between py-1.5 border-b border-white/5">
+              <span class="text-slate-400">Wi-Fi SSID:</span>
+              <span class="text-slate-200" id="diagSsid">Not connected to Wi-Fi</span>
+            </div>
+            <div class="flex justify-between py-1.5 border-b border-white/5">
+              <span class="text-slate-400">First Identified:</span>
+              <span class="text-slate-300" id="diagFirstSeen">--</span>
+            </div>
+            <div class="flex justify-between py-1.5">
+              <span class="text-slate-400">Last Seen Active:</span>
+              <span class="text-slate-300" id="diagLastSeen">--</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- IP & Routing Card -->
+        <div class="glass-panel p-6 space-y-4">
+          <h3 class="text-base font-bold text-white flex items-center gap-2 border-b border-white/10 pb-3">
+            <i data-lucide="globe" class="w-5 h-5 text-cyan-400"></i>
+            IP & Carrier Telemetry
+          </h3>
+
+          <div class="space-y-3 text-xs">
+            <div class="flex justify-between py-1.5 border-b border-white/5">
+              <span class="text-slate-400">Public IP Address:</span>
+              <span class="mono font-bold text-cyan-300" id="diagPublicIp">--</span>
+            </div>
+            <div class="flex justify-between py-1.5 border-b border-white/5">
+              <span class="text-slate-400">Local Outbound IP:</span>
+              <span class="mono text-slate-200" id="diagLocalIp">--</span>
+            </div>
+            <div class="flex justify-between py-1.5 border-b border-white/5">
+              <span class="text-slate-400">Default Gateway Router:</span>
+              <span class="mono text-slate-200" id="diagGatewayIp">--</span>
+            </div>
+            <div class="flex justify-between py-1.5 border-b border-white/5">
+              <span class="text-slate-400">ISP / Autonomous System:</span>
+              <span class="font-semibold text-slate-200" id="diagIsp">--</span>
+            </div>
+            <div class="flex justify-between py-1.5 border-b border-white/5">
+              <span class="text-slate-400">Location (City, Country):</span>
+              <span class="text-slate-200" id="diagLocation">--</span>
+            </div>
+            <div class="flex justify-between py-1.5">
+              <span class="text-slate-400">Network Adapter:</span>
+              <span class="text-slate-300" id="diagAdapter">--</span>
+            </div>
+          </div>
+        </div>
+
+      </div>
+
+    </section>
+
+  </main>
+
+  <!-- MODAL: IMPROVE INTERNET & ROUTER RESTART -->
+  <div id="optimizerModal" class="modal-overlay">
+    <div class="modal-content max-w-lg">
+      <div class="flex items-center justify-between pb-3 border-b border-white/10 mb-4">
+        <h3 class="text-base font-bold text-white flex items-center gap-2">
+          <i data-lucide="zap" class="w-5 h-5 text-emerald-400"></i>
+          Improve Internet & Router Tools
+        </h3>
+        <button id="closeOptimizerBtn" class="text-slate-400 hover:text-white p-1">
+          <i data-lucide="x" class="w-4 h-4"></i>
+        </button>
+      </div>
+
+      <p class="text-xs text-slate-400 mb-5 leading-relaxed">
+        Flush clogged DNS caches, reset local network buffers, or restart your home router to clear congested NAT session tables.
+      </p>
+
+      <div class="space-y-4">
+        
+        <!-- Tool 1: Quick Network Flush -->
+        <div class="p-4 rounded-xl bg-slate-900/80 border border-white/10 space-y-3">
+          <div class="flex items-start justify-between gap-3">
+            <div>
+              <div class="text-sm font-bold text-white flex items-center gap-1.5">
+                <i data-lucide="refresh-cw" class="w-4 h-4 text-cyan-400"></i>
+                Quick Network Optimization
+              </div>
+              <p class="text-xs text-slate-400 mt-1">
+                Flushes Windows DNS resolver cache, purges stale socket routes, and re-tests ping latency.
+              </p>
+            </div>
+            <button id="runOptimizeBtn" class="btn btn-primary text-xs px-4 py-2 shrink-0">
+              <span>Run Boost</span>
+            </button>
+          </div>
+          <div id="optimizeStatusBox" class="text-xs text-emerald-400 hidden pt-2 border-t border-white/5 mono">
+            <!-- Dynamic output -->
+          </div>
+        </div>
+
+        <!-- Tool 2: Restart Home Router -->
+        <div class="p-4 rounded-xl bg-slate-900/80 border border-white/10 space-y-3">
+          <div class="flex items-start justify-between gap-3">
+            <div>
+              <div class="text-sm font-bold text-white flex items-center gap-1.5">
+                <i data-lucide="router" class="w-4 h-4 text-purple-400"></i>
+                Restart Home Router
+              </div>
+              <p class="text-xs text-slate-400 mt-1">
+                Gateway: <strong class="text-indigo-300 mono" id="routerGatewayIpDisplay">192.168.1.1</strong>. Reboots router to clear internal memory and re-establish a fresh ISP link.
+              </p>
+            </div>
+            <button id="rebootRouterBtn" class="btn btn-boost text-xs px-4 py-2 shrink-0">
+              <i data-lucide="power" class="w-3.5 h-3.5"></i>
+              <span>Restart Router</span>
+            </button>
+          </div>
+
+          <div class="flex items-center justify-between pt-2 border-t border-white/5 text-xs text-slate-400">
+            <span>Direct router web portal:</span>
+            <a id="openRouterAdminLink" href="http://192.168.1.1" target="_blank" rel="noopener noreferrer" class="text-cyan-400 hover:text-cyan-300 font-semibold flex items-center gap-1">
+              <span>Open Console (192.168.1.1)</span>
+              <i data-lucide="external-link" class="w-3.5 h-3.5"></i>
+            </a>
+          </div>
+
+          <div id="rebootStatusBox" class="text-xs text-purple-400 hidden pt-2 border-t border-white/5 mono">
+            <!-- Dynamic output -->
+          </div>
+        </div>
+
+      </div>
+
+      <div class="flex justify-end pt-5">
+        <button id="closeOptimizerFooterBtn" class="btn text-xs px-5 py-2">Close</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal: Rename Network -->
+  <div id="renameModal" class="modal-overlay">
+    <div class="modal-content">
+      <div class="flex items-center justify-between pb-3 border-b border-white/10 mb-4">
+        <h3 class="text-base font-bold text-white flex items-center gap-2">
+          <i data-lucide="edit-3" class="w-4 h-4 text-indigo-400"></i>
+          Name This Connection
+        </h3>
+        <button id="closeModalBtn" class="text-slate-400 hover:text-white p-1">
+          <i data-lucide="x" class="w-4 h-4"></i>
+        </button>
+      </div>
+
+      <p class="text-xs text-slate-400 mb-4 leading-relaxed">
+        Give this network a friendly name (e.g. <em>"Home 1G Fiber"</em>, <em>"ProtonVPN NYC"</em>, <em>"Living Room 5GHz"</em>). Banet will automatically remember it across sessions and use it to group your speed and ping analytics.
+      </p>
+
+      <div class="space-y-4">
+        <div>
+          <label class="block text-xs font-semibold text-slate-300 mb-1.5 uppercase tracking-wide">Connection Name</label>
+          <input type="text" id="networkNameInput" class="w-full bg-slate-900 border border-white/15 rounded-xl px-4 py-2.5 text-sm text-white focus:outline-none focus:border-indigo-500 font-medium" placeholder="Enter network name...">
+        </div>
+
+        <div class="flex justify-end gap-2.5 pt-2">
+          <button id="cancelRenameBtn" class="btn text-xs px-4 py-2">Cancel</button>
+          <button id="saveRenameBtn" class="btn btn-primary text-xs px-5 py-2">Save Name</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Footer -->
+  <footer class="border-t border-white/5 py-4 px-4 text-center text-xs text-slate-500">
+    Banet • Local Zero-Config Internet Monitor & Benchmark • Runs locally on your machine
+  </footer>
+
+  <!-- App Script -->
+  <script src="/static/js/app.js"></script>
+</body>
+</html>
