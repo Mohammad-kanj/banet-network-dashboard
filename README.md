@@ -1,6 +1,6 @@
 # ⚡ Banet — Live Internet Telemetry & Speed Dashboard
 
-![Banet Network Dashboard](image_c08422.jpg)
+![Banet Network Dashboard](banet.png)
 
 **Banet** is a smooth, real-time internet performance monitor, speed benchmark, and network optimization suite designed to run entirely locally. 
 
